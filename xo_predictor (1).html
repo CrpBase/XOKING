@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XO Market - King Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700;900&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #000000; --white: #ffffff; --pink: #FF87A6;
+    --purple: #A293FF; --lime: #D0FA49; --orange: #FF9500; --cyan: #18DAEB;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--black); color:var(--white); font-family:'Figtree',sans-serif; min-height:100vh; overflow-x:hidden; }
+  body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"); pointer-events:none; z-index:0; }
+  .container { max-width:520px; margin:0 auto; padding:0 20px 60px; position:relative; z-index:1; }
+  .header { display:flex; align-items:center; justify-content:space-between; padding:24px 0 20px; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:28px; }
+  .logo-area { display:flex; align-items:center; gap:10px; }
+  .logo-img { width:34px; height:auto; object-fit:contain; }
+  .logo-text { font-family:'Rubik',sans-serif; font-weight:900; font-size:18px; letter-spacing:-0.5px; }
+  .logo-text span { color:var(--pink); }
+
+  /* Winner card */
+  .winner-card { background:linear-gradient(135deg,rgba(255,135,166,0.15),rgba(162,147,255,0.12)); border:1.5px solid var(--pink); border-radius:20px; padding:28px 24px; text-align:center; margin-bottom:20px; position:relative; overflow:hidden; display:none; animation:fadeIn 0.6s ease; }
+  .winner-card.visible { display:block; }
+  .winner-card::after { content:''; position:absolute; inset:0; background:radial-gradient(circle at 50% 0%,rgba(255,135,166,0.18) 0%,transparent 70%); pointer-events:none; }
+  .crown { font-size:38px; display:block; margin-bottom:8px; animation:float 3s ease-in-out infinite; }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+  .winner-label { font-family:'Rubik',sans-serif; font-weight:900; font-size:11px; letter-spacing:2.5px; text-transform:uppercase; color:var(--pink); margin-bottom:10px; }
+  .winner-nick { font-family:'Rubik',sans-serif; font-weight:900; font-size:36px; color:var(--white); line-height:1; margin-bottom:6px; }
+  .winner-sub { font-size:13px; color:rgba(255,255,255,0.45); }
+  .winner-sub strong { color:var(--lime); }
+
+  /* Event card */
+  .event-card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:22px; margin-bottom:18px; position:relative; overflow:hidden; }
+  .event-card::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:linear-gradient(90deg,var(--pink),var(--purple),var(--cyan)); }
+  .event-label { font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--pink); margin-bottom:8px; font-family:'Rubik',sans-serif; }
+  .event-title { font-family:'Rubik',sans-serif; font-weight:900; font-size:24px; line-height:1.1; margin-bottom:6px; }
+  .event-title span { color:var(--lime); }
+  .event-meta { font-size:12px; color:rgba(255,255,255,0.4); margin-bottom:12px; }
+  .event-meta a { color:var(--cyan); text-decoration:none; font-weight:600; }
+  .event-meta a:hover { text-decoration:underline; }
+  .cp-tag { display:inline-flex; align-items:center; gap:5px; background:rgba(208,250,73,0.1); border:1px solid rgba(208,250,73,0.2); border-radius:8px; padding:4px 10px; font-size:12px; font-weight:700; color:var(--lime); font-family:'Rubik',sans-serif; margin-bottom:14px; }
+
+  /* Timer */
+  .timer-row { display:flex; gap:8px; margin-bottom:12px; }
+  .tblock { flex:1; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.07); border-radius:10px; padding:9px 4px; text-align:center; }
+  .tnum { font-family:'Rubik',sans-serif; font-weight:900; font-size:26px; color:var(--white); line-height:1; display:block; }
+  .tlabel { font-size:9px; color:rgba(255,255,255,0.35); font-weight:600; letter-spacing:0.8px; text-transform:uppercase; margin-top:2px; display:block; }
+  .deadline-row { display:flex; align-items:center; gap:6px; font-size:12px; color:rgba(255,255,255,0.4); }
+  .dot { width:6px; height:6px; border-radius:50%; background:var(--orange); animation:pulse 2s infinite; flex-shrink:0; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+  .closed-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(255,149,0,0.12); border:1px solid rgba(255,149,0,0.25); border-radius:8px; padding:5px 12px; font-size:12px; font-weight:600; color:var(--orange); }
+
+  /* Form */
+  .form-card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:22px; margin-bottom:18px; }
+  .form-title { font-family:'Rubik',sans-serif; font-weight:900; font-size:17px; margin-bottom:16px; }
+  .input-group { margin-bottom:13px; }
+  .input-label { font-size:10px; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:rgba(255,255,255,0.45); margin-bottom:5px; display:block; font-family:'Rubik',sans-serif; }
+  .input-field { width:100%; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1); border-radius:11px; padding:12px 15px; color:var(--white); font-family:'Figtree',sans-serif; font-size:15px; outline:none; transition:border-color 0.2s; }
+  .input-field:focus { border-color:var(--pink); }
+  .input-field::placeholder { color:rgba(255,255,255,0.18); }
+  .input-field[readonly] { opacity:0.6; cursor:default; }
+  .price-wrap { position:relative; }
+  .price-prefix { position:absolute; left:15px; top:50%; transform:translateY(-50%); color:var(--lime); font-family:'Rubik',sans-serif; font-weight:700; font-size:15px; pointer-events:none; }
+  .price-wrap .input-field { padding-left:28px; }
+  .submit-btn { width:100%; background:var(--pink); color:var(--black); border:none; border-radius:11px; padding:14px; font-family:'Rubik',sans-serif; font-weight:900; font-size:15px; cursor:pointer; transition:transform 0.15s,opacity 0.15s; margin-top:2px; }
+  .submit-btn:hover { opacity:0.88; transform:translateY(-1px); }
+  .submit-btn:disabled { opacity:0.35; cursor:not-allowed; transform:none; }
+  .already-in { background:rgba(162,147,255,0.1); border:1px solid rgba(162,147,255,0.22); border-radius:12px; padding:14px 16px; font-size:13px; color:var(--purple); font-weight:600; text-align:center; margin-bottom:18px; animation:fadeIn 0.4s ease; }
+  .already-in strong { color:var(--white); }
+  .lb-card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:22px; }
+  .lb-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .lb-title { font-family:'Rubik',sans-serif; font-weight:900; font-size:17px; }
+  .lb-count { font-size:12px; color:rgba(255,255,255,0.35); }
+  .lb-row { display:flex; align-items:center; gap:11px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+  .lb-row:last-child { border-bottom:none; }
+  .lb-rank { font-family:'Rubik',sans-serif; font-weight:700; font-size:13px; color:rgba(255,255,255,0.25); width:22px; text-align:center; flex-shrink:0; }
+  .lb-nick { flex:1; font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lb-price { font-family:'Rubik',sans-serif; font-weight:700; font-size:14px; color:var(--lime); flex-shrink:0; }
+  .lb-time { font-size:11px; color:rgba(255,255,255,0.25); width:48px; text-align:right; flex-shrink:0; }
+  .empty-lb { text-align:center; padding:28px 0; color:rgba(255,255,255,0.25); font-size:14px; }
+  .loading-lb { text-align:center; padding:20px 0; color:rgba(255,255,255,0.25); font-size:13px; }
+
+  /* Ended banner */
+  .ended-banner { background:rgba(255,135,166,0.08); border:1px solid rgba(255,135,166,0.2); border-radius:14px; padding:18px 20px; text-align:center; margin-bottom:18px; }
+  .ended-title { font-family:'Rubik',sans-serif; font-weight:900; font-size:16px; color:var(--pink); margin-bottom:4px; }
+  .ended-sub { font-size:13px; color:rgba(255,255,255,0.4); }
+
+  /* Modal */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .modal-box { background:#0f0f0f; border:1px solid rgba(255,255,255,0.1); border-radius:22px; padding:32px 26px; width:100%; max-width:360px; text-align:center; animation:fadeIn 0.3s ease; }
+  .modal-logo { width:48px; margin:0 auto 16px; display:block; }
+  .modal-title { font-family:'Rubik',sans-serif; font-weight:900; font-size:22px; margin-bottom:6px; }
+  .modal-sub { font-size:14px; color:rgba(255,255,255,0.45); margin-bottom:22px; line-height:1.5; }
+  .modal-input { width:100%; background:rgba(0,0,0,0.5); border:1.5px solid rgba(255,255,255,0.12); border-radius:12px; padding:14px 16px; color:var(--white); font-family:'Figtree',sans-serif; font-size:16px; outline:none; transition:border-color 0.2s; text-align:center; }
+  .modal-input:focus { border-color:var(--pink); }
+  .modal-input::placeholder { color:rgba(255,255,255,0.18); }
+  .modal-btn { width:100%; background:var(--pink); color:var(--black); border:none; border-radius:12px; padding:14px; font-family:'Rubik',sans-serif; font-weight:900; font-size:15px; cursor:pointer; margin-top:12px; transition:opacity 0.2s; }
+  .modal-btn:hover { opacity:0.88; }
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--white); color:var(--black); font-family:'Rubik',sans-serif; font-weight:700; font-size:14px; padding:11px 20px; border-radius:11px; transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1); z-index:100; white-space:nowrap; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .animate-in { animation:fadeIn 0.4s ease forwards; }
+</style>
+</head>
+<body>
+
+<!-- Nickname modal -->
+<div class="modal-overlay" id="nickModal">
+  <div class="modal-box">
+    <img class="modal-logo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Crect width='60' height='60' rx='12' fill='%23FF87A6'/%3E%3Ctext x='50%25' y='38' text-anchor='middle' font-size='32' font-weight='900' font-family='Arial' fill='%23000'%3EXO%3C/text%3E%3C/svg%3E" alt="XO">
+    <div class="modal-title">Welcome to<br><span style="color:var(--pink)">XO Market</span></div>
+    <div class="modal-sub">Enter your nickname to join<br>the prediction challenge</div>
+    <input class="modal-input" id="modalNickInput" type="text" placeholder="@your_nickname" maxlength="30" autocomplete="off">
+    <button class="modal-btn" onclick="confirmNick()">Let's go 🐓</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="header">
+    <div class="logo-area">
+      <img class="logo-img" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Crect width='60' height='60' rx='12' fill='%23FF87A6'/%3E%3Ctext x='50%25' y='38' text-anchor='middle' font-size='32' font-weight='900' font-family='Arial' fill='%23000'%3EXO%3C/text%3E%3C/svg%3E" alt="XO">
+      <div class="logo-text"><span>XO</span> MARKET</div>
+    </div>
+  </div>
+
+  <!-- Winner card -->
+  <div class="winner-card" id="winnerCard">
+    <span class="crown">👑</span>
+    <div class="winner-label">King Predictor for the Week</div>
+    <div class="winner-nick" id="winnerNick">@username</div>
+    <div class="winner-sub" id="winnerSub">Closest guess: <strong id="winnerPrice">$0.00</strong></div>
+  </div>
+
+  <!-- Ended banner (shown after event ends, before winner announced) -->
+  <div class="ended-banner" id="endedBanner" style="display:none;">
+    <div class="ended-title">🔒 Event Ended</div>
+    <div class="ended-sub" id="endedBannerSub">Submissions are closed. Results coming soon.</div>
+  </div>
+
+  <!-- Event card -->
+  <div class="event-card animate-in">
+    <div class="event-label" id="eventLabel">📅 Weekly Event</div>
+    <div class="event-title" id="eventTitle">Loading...</div>
+    <div class="event-meta" id="eventMeta"></div>
+    <div class="cp-tag" id="cpTag">🏆 100 CP for the winner</div>
+    <div class="timer-row" id="timerRow">
+      <div class="tblock"><span class="tnum" id="tD">00</span><span class="tlabel">days</span></div>
+      <div class="tblock"><span class="tnum" id="tH">00</span><span class="tlabel">hours</span></div>
+      <div class="tblock"><span class="tnum" id="tM">00</span><span class="tlabel">mins</span></div>
+      <div class="tblock"><span class="tnum" id="tS">00</span><span class="tlabel">secs</span></div>
+    </div>
+    <div id="deadlineRow" class="deadline-row">
+      <div class="dot"></div>
+      <span id="deadlineText">Submissions close...</span>
+    </div>
+    <div id="closedRow" style="display:none;">
+      <span class="closed-badge">🔒 Submissions closed</span>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <div class="form-card animate-in" id="formCard">
+    <div class="form-title">Enter your prediction</div>
+    <div class="input-group">
+      <label class="input-label">Nickname</label>
+      <input class="input-field" id="nickDisplay" readonly>
+    </div>
+    <div class="input-group">
+      <label class="input-label" id="formPriceLabel">Your prediction</label>
+      <div class="price-wrap">
+        <span class="price-prefix">$</span>
+        <input class="input-field" id="priceInput" type="number" placeholder="3,300.00" step="0.01" min="1">
+      </div>
+    </div>
+    <button class="submit-btn" id="submitBtn" onclick="submitEntry()">Submit Prediction</button>
+  </div>
+
+  <!-- Already submitted -->
+  <div id="alreadyIn" style="display:none;">
+    <div class="already-in">
+      You're in! Your prediction: <strong id="myPriceDisplay"></strong><br>
+      <span style="color:rgba(255,255,255,0.35); font-size:12px; margin-top:3px; display:block;">Good luck, <span id="myNickDisplay"></span> 🤞</span>
+    </div>
+  </div>
+
+  <!-- Leaderboard -->
+  <div class="lb-card animate-in">
+    <div class="lb-header">
+      <div class="lb-title">All Predictions</div>
+      <div class="lb-count" id="lbCount">— entries</div>
+    </div>
+    <div id="lbList"><div class="loading-lb">Loading...</div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// CONFIGURE: anon key only — read-only access
+// ============================================================
+const SUPABASE_URL = 'https://turovujkxcsoscyjaytv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1cm92dWpreGNzb3NjeWpheXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2NjI4NDgsImV4cCI6MjA5NDIzODg0OH0.GkHy4xZjYlfKeI6iIL09uKOemwLG8k2TLRQAniTydio';
+// ============================================================
+
+let myNick  = localStorage.getItem('xo_nick') || null;
+let eventConfig = null; // loaded from Supabase
+let myEntry = null;
+
+const fmt  = n => String(n).padStart(2,'0');
+const fmtP = p => Number(p).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc  = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function sbH() {
+  return { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+}
+
+// Load event config from Supabase
+async function loadEventConfig() {
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/xo_events?select=*&order=created_at.desc&limit=1', { headers: sbH() });
+    const data = await r.json();
+    if (data && data[0]) {
+      eventConfig = data[0];
+      myEntry = JSON.parse(localStorage.getItem('xo_entry_' + eventConfig.event_id) || 'null');
+      applyEventConfig();
+    }
+  } catch(e) {}
+}
+
+function applyEventConfig() {
+  if (!eventConfig) return;
+  const e = eventConfig;
+
+  // Label
+  if (e.event_label) document.getElementById('eventLabel').textContent = e.event_label;
+
+  // Title
+  if (e.title && e.title_highlight) {
+    document.getElementById('eventTitle').innerHTML = e.title + ' <span>' + esc(e.title_highlight) + '</span>';
+  } else if (e.title) {
+    document.getElementById('eventTitle').textContent = e.title;
+  }
+
+  // Meta
+  if (e.meta_text) {
+    const meta = document.getElementById('eventMeta');
+    if (e.meta_link && e.meta_link_text) {
+      meta.innerHTML = e.meta_text.replace('LINK', '<a href="' + e.meta_link + '" target="_blank">' + esc(e.meta_link_text) + '</a>');
+    } else {
+      meta.textContent = e.meta_text;
+    }
+  }
+
+  // CP tag
+  if (e.cp_reward) document.getElementById('cpTag').textContent = '🏆 ' + e.cp_reward;
+
+  // Price label
+  if (e.price_label) document.getElementById('formPriceLabel').textContent = e.price_label;
+
+  // Deadline text
+  if (e.deadline_utc) {
+    const dl = new Date(e.deadline_utc);
+    const opts = { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'UTC' };
+    document.getElementById('deadlineText').textContent =
+      'Submissions close ' + dl.toLocaleString('en-US', opts) + ' UTC';
+  }
+}
+
+function getDeadline()  { return eventConfig ? new Date(eventConfig.deadline_utc)  : new Date(0); }
+function getResolveAt() { return eventConfig ? new Date(eventConfig.resolve_at_utc) : new Date(0); }
+function isOpen()       { return eventConfig ? new Date() < getDeadline() : false; }
+function isEnded()      { return eventConfig ? new Date() >= getDeadline() : false; }
+
+function updateTimer() {
+  if (!eventConfig) return;
+  const target = isOpen() ? getDeadline() : getResolveAt();
+  const diff = target - new Date();
+  if (diff <= 0) {
+    ['tD','tH','tM','tS'].forEach(id => document.getElementById(id).textContent = '00');
+    return;
+  }
+  document.getElementById('tD').textContent = fmt(Math.floor(diff/86400000));
+  document.getElementById('tH').textContent = fmt(Math.floor((diff%86400000)/3600000));
+  document.getElementById('tM').textContent = fmt(Math.floor((diff%3600000)/60000));
+  document.getElementById('tS').textContent = fmt(Math.floor((diff%60000)/1000));
+}
+
+async function renderState() {
+  if (!eventConfig) return;
+  const open = isOpen();
+  const e = eventConfig;
+
+  // Winner display
+  if (e.winner_nick) {
+    document.getElementById('winnerCard').classList.add('visible');
+    document.getElementById('winnerNick').textContent = '@' + e.winner_nick;
+    document.getElementById('winnerPrice').textContent = '$' + fmtP(e.winner_price);
+    if (e.actual_price) {
+      document.getElementById('winnerSub').innerHTML =
+        'Closest to <strong style="color:var(--cyan)">$' + fmtP(e.actual_price) + '</strong> &nbsp;·&nbsp; Guess: <strong>$' + fmtP(e.winner_price) + '</strong>';
+    }
+  }
+
+  // Ended banner (submissions closed, no winner yet)
+  const endedBanner = document.getElementById('endedBanner');
+  if (!open && !e.winner_nick) {
+    endedBanner.style.display = 'block';
+  } else {
+    endedBanner.style.display = 'none';
+  }
+
+  // Timer section
+  document.getElementById('timerRow').style.display = open ? 'flex' : 'none';
+  document.getElementById('deadlineRow').style.display = open ? 'flex' : 'none';
+  document.getElementById('closedRow').style.display   = open ? 'none' : 'block';
+
+  // Form
+  renderFormState(open);
+
+  // Leaderboard
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/xo_predictions?event_id=eq.' + e.event_id + '&order=submitted_at.asc&select=nick,price,submitted_at', { headers: sbH() });
+    const entries = await r.json();
+    renderLeaderboard(entries);
+  } catch(ex) {
+    document.getElementById('lbList').innerHTML = '<div class="empty-lb">Could not load predictions</div>';
+  }
+}
+
+function renderFormState(open) {
+  if (!myNick) return;
+  document.getElementById('nickDisplay').value = myNick;
+  if (!open) {
+    document.getElementById('formCard').style.display = 'none';
+    document.getElementById('alreadyIn').style.display = 'none';
+    return;
+  }
+  if (myEntry) {
+    document.getElementById('formCard').style.display = 'none';
+    document.getElementById('alreadyIn').style.display = 'block';
+    document.getElementById('myPriceDisplay').textContent = '$' + fmtP(myEntry.price);
+    document.getElementById('myNickDisplay').textContent = myEntry.nick;
+  } else {
+    document.getElementById('formCard').style.display = 'block';
+    document.getElementById('alreadyIn').style.display = 'none';
+  }
+}
+
+function renderLeaderboard(entries) {
+  const count = entries.length;
+  document.getElementById('lbCount').textContent = count + ' entr' + (count===1?'y':'ies');
+  if (!count) {
+    document.getElementById('lbList').innerHTML = '<div class="empty-lb">No predictions yet. Be the first! 🐓</div>';
+    return;
+  }
+  document.getElementById('lbList').innerHTML = entries.map((e,i) => {
+    const t = new Date(e.submitted_at).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+    const isMe = myNick && e.nick.toLowerCase() === myNick.replace('@','').toLowerCase();
+    return `<div class="lb-row" style="${isMe?'background:rgba(162,147,255,0.07);border-radius:8px;padding:10px 6px;margin:0 -6px;':''}">
+      <span class="lb-rank">${i===0?'👑':i+1}</span>
+      <span class="lb-nick">${esc(e.nick)}${isMe?' <span style="color:var(--purple);font-size:11px">(you)</span>':''}</span>
+      <span class="lb-price">$${fmtP(e.price)}</span>
+      <span class="lb-time">${t}</span>
+    </div>`;
+  }).join('');
+}
+
+async function submitEntry() {
+  if (!isOpen()) { showToast('Submissions are closed!'); return; }
+  const price = parseFloat(document.getElementById('priceInput').value);
+  if (!price || price <= 0) { showToast('Enter a valid price!'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  const cleanNick = myNick.startsWith('@') ? myNick.slice(1) : myNick;
+  try {
+    const fp = await getFingerprint();
+    const r = await fetch(SUPABASE_URL + '/functions/v1/submit-prediction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY },
+      body: JSON.stringify({ event_id: eventConfig.event_id, nick: cleanNick, price, fp })
+    });
+    const data = await r.json();
+    if (r.status === 409 || data.error === 'duplicate_nick') throw new Error('duplicate_nick');
+    if (r.status === 429 || data.error === 'duplicate_fp')   throw new Error('duplicate_fp');
+    if (!r.ok) throw new Error('insert failed');
+
+    myEntry = { nick: cleanNick, price };
+    localStorage.setItem('xo_entry_' + eventConfig.event_id, JSON.stringify(myEntry));
+    showToast('Prediction submitted! Good luck 🐓');
+    renderState();
+  } catch(ex) {
+    if (ex.message === 'duplicate_nick') showToast('This nickname already has a prediction!');
+    else if (ex.message === 'duplicate_fp') showToast('You already submitted from this device!');
+    else showToast('Error submitting. Try again.');
+    btn.disabled = false;
+    btn.textContent = 'Submit Prediction';
+  }
+}
+
+async function getFingerprint() {
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top'; ctx.font = '14px Arial';
+    ctx.fillText('XO Market 🐓', 2, 2);
+    const raw = canvas.toDataURL() + screen.width + screen.height +
+                Intl.DateTimeFormat().resolvedOptions().timeZone +
+                navigator.language + navigator.hardwareConcurrency;
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,32);
+  } catch(e) {
+    return 'unknown_' + Math.random().toString(36).slice(2);
+  }
+}
+
+function confirmNick() {
+  let val = document.getElementById('modalNickInput').value.trim();
+  if (!val || val.length < 2) { showToast('Nickname too short!'); return; }
+  if (!val.startsWith('@')) val = '@' + val;
+  myNick = val;
+  localStorage.setItem('xo_nick', myNick);
+  document.getElementById('nickModal').style.display = 'none';
+  document.getElementById('nickDisplay').value = myNick;
+  renderState();
+}
+
+document.getElementById('modalNickInput').addEventListener('keydown', e => { if(e.key==='Enter') confirmNick(); });
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// Init
+async function init() {
+  if (myNick) document.getElementById('nickModal').style.display = 'none';
+  await loadEventConfig();
+  updateTimer();
+  setInterval(updateTimer, 1000);
+  renderState();
+  setInterval(async () => {
+    await loadEventConfig();
+    renderState();
+  }, 15000);
+}
+init();
+</script>
+</body>
+</html>
